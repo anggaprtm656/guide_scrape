@@ -5,6 +5,13 @@ on:
     # Berjalan otomatis setiap 3 hari sekali pukul 04:00 UTC (11:00 WIB)
     - cron: '0 4 */3 * *'
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'data/**'
+      - 'README.md'
+      - '.gitignore'
 
 jobs:
   update-builds:
