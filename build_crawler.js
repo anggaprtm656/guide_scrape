@@ -164,12 +164,69 @@ function parseGame8Auto(html) {
     }
   }
 
+  // Ekstraksi Rekomendasi Tim
+  let teams = [];
+  const headingRegex = /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi;
+  let hMatch;
+  const headings = [];
+  while ((hMatch = headingRegex.exec(cleanHtml)) !== null) {
+    const title = hMatch[1].replace(/<[^>]+>/g, "").trim();
+    if (/team/i.test(title) && !/how to build|rating|tier list|ranking|maker|best free|best team comp/i.test(title)) {
+      headings.push({ title, index: hMatch.index });
+    }
+  }
+
+  for (let i = 0; i < headings.length; i++) {
+    const h = headings[i];
+    const nextIdx = i + 1 < headings.length ? headings[i + 1].index : h.index + 3500;
+    const chunk = cleanHtml.slice(h.index, Math.min(nextIdx, h.index + 3500));
+
+    const tableMatch = chunk.match(/<table[^>]*>([\s\S]*?)<\/table>/i);
+    if (tableMatch) {
+      const rows = [...tableMatch[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+      for (const r of rows) {
+        const rowContent = r[1];
+        if (rowContent.toLowerCase().includes("team summary") || rowContent.toLowerCase().includes("bangboo alternative")) continue;
+
+        const charMatches = [...rowContent.matchAll(/<a[^>]*>([\s\S]*?)<\/a>/gi)]
+          .map(m => m[1].replace(/<[^>]+>/g, "").trim())
+          .filter(name => {
+            const low = name.toLowerCase();
+            return (
+              name.length >= 2 &&
+              name.length <= 25 &&
+              !low.includes("image") &&
+              !low.includes("guide") &&
+              !low.includes("best") &&
+              !low.includes("build") &&
+              !low.includes("team") &&
+              !low.includes("character") &&
+              !low.includes("user")
+            );
+          });
+
+        if (charMatches.length >= 2) {
+          const teamLabel = h.title
+            .replace(/\bteams?\b/gi, "")
+            .replace(/\bcomps?\b/gi, "")
+            .replace(/^[-\s:]+|[-\s:]+$/g, "")
+            .trim() || "Rekomendasi";
+          const memberList = [...new Set(charMatches)].slice(0, 4).join(" + ");
+          teams.push(`• **${teamLabel}**: ${memberList}`);
+          break;
+        }
+      }
+    }
+    if (teams.length >= 3) break;
+  }
+
   // Deduplicate
   weapons = [...new Set(weapons)];
   artifacts = [...new Set(artifacts)];
   stats = [...new Set(stats)];
+  teams = [...new Set(teams)].slice(0, 3);
 
-  return { weapons, artifacts, stats };
+  return { weapons, artifacts, stats, teams };
 }
 
 async function run() {
@@ -338,6 +395,7 @@ async function run() {
         weapons: parsed.weapons.join('\n'),
         artifacts: parsed.artifacts.join('\n'),
         stats: parsed.stats.join('\n'),
+        teams: (parsed.teams || []).join('\n'),
         thumbnail,
         lastUpdated: new Date().toISOString()
       };
